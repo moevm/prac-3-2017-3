@@ -1,26 +1,28 @@
 # -*- coding: utf-8 -*-
+
 import csv
 import argparse
 import datetime
+import openpyxl
+
 NEWLINE = ''
 SEMICOLON = ';'
-PERCENT = '%'
+FILE_PATH = '/home/aries/PycharmProjects/BuildingStatistics/Распределение студентов 1 курса на Stepik.xlsx'
 INPUT_FILE = 'sourse.csv'
-OUTPUT_FILE = 'programming_{}.csv'
-TABLE_ONE = ['таблица 1']
-TABLE_TWO = ['таблица 2']
-TABLE_THREE = ['таблица 3']
-TABLE_FOUR = ['таблица 4']
-USER_ID = 'id'
-LAST_NAME = 'Фамилия'
-FIRST_NAME = 'Имя'
-TOTAL = 'Баллы'
-PERCENTAGE_OF_TOTAL = '% от общего числа'
-SCORED_0_POINTS = ['Студенты, которые набрали 0 баллов']
-SCORED_MAX_SCORE = ['Студенты, которые набрали максимальный балл']
-LESS_40_PERCENT = 'Количество студентов, набравших < 40 %;{}'
-MORE_40_LESS_70_PERCENT = 'Количество студентов, набравших > 39% и < 71%;{}'
-MORE_70_PERCENT = 'Количество студентов, набравших > 70%;{}'
+INITIAL_DATA = 'Начальные данные, {}'
+REPORT = 'Сводка, {}'
+REPORT_DATE = 'Сводка, {}'
+USER_ID = 'user_id'
+LAST_NAME = 'last_name'
+FIRST_NAME = 'first_name'
+TOTAL = 'total'
+MAX_SCORE = 'Максимальный балл'
+PERCENTAGE_OF_TOTAL = '% от максимального балла'
+SCORED_0_POINTS = 'Студенты, которые набрали 0 баллов'
+GAINED_LESS_40_PERCENT = 'Список студентов, которые набрали < 40%'
+GAINED_MORE_40_LESS_70_PERCENT = 'Список студентов, которые набрали > 39% и < 71%'
+GAINED_MORE_70_PERCENT = 'Список студентов, которые набрали > 70%'
+SCORED_MAX_SCORE = 'Студенты, которые набрали максимальный балл ({})'
 
 def pars():
     parser = argparse.ArgumentParser()
@@ -28,15 +30,7 @@ def pars():
     parser.add_argument('-n', '--name', nargs=1, help='Module Name')
     max_score = parser.parse_args()
     module_name = parser.parse_args()
-    return max_score.max[0], module_name.name
-
-def read_file():
-    output_file = open(OUTPUT_FILE.format(str(datetime.datetime.now().strftime('%d %B'))), 'wb')
-    wrtr = csv.writer(output_file)
-    return wrtr, output_file
-
-def close_file(output_file):
-    output_file.close()
+    return max_score.max[0], module_name.name[0]
 
 def filling_table():
     user_id = []
@@ -47,40 +41,40 @@ def filling_table():
     rdr = csv.reader(input_file)
     next(rdr)
     for user in rdr :
-        id = ''
-        last = ''
-        first = ''
-        tot = ''
-        flag_id = bool(1)
-        flag_last = bool(0)
-        flag_first = bool(0)
-        flag_total = bool(0)
+        id = NEWLINE
+        last = NEWLINE
+        first = NEWLINE
+        tot = NEWLINE
+        flag_id = True
+        flag_last = False
+        flag_first = False
+        flag_total = False
 
         for i in user[0]:
             if flag_id:
                 if i == SEMICOLON:
-                    flag_id = bool(0)
-                    flag_last = bool(1)
+                    flag_id = False
+                    flag_last = True
                     continue
-                else :
+                else:
                     id += i
             if flag_last:
                 if i == SEMICOLON:
-                    flag_last = bool(0)
-                    flag_first = bool(1)
+                    flag_last = False
+                    flag_first = True
                     continue
                 else:
                     last += i
             if flag_first:
                 if i == SEMICOLON:
-                    flag_first = bool(0)
-                    flag_total = bool(1)
+                    flag_first = False
+                    flag_total = True
                     continue
                 else:
                     first += i
             if flag_total:
                 if i == SEMICOLON:
-                    flag_id = bool(0)
+                    flag_id = False
                 else:
                     tot += i
         user_id.append(id)
@@ -91,108 +85,77 @@ def filling_table():
     input_file.close()
     return user_id, last_name, first_name, total
 
-def summary_table(wrtr, user_id, last_name, first_name, total, value):
-    myTable = NEWLINE
-    myTable += USER_ID
-    myTable += SEMICOLON
-    myTable += LAST_NAME
-    myTable += SEMICOLON
-    myTable += FIRST_NAME
-    myTable += SEMICOLON
-    myTable += TOTAL
-    myTable += SEMICOLON
-    myTable += PERCENTAGE_OF_TOTAL
-    myTable += SEMICOLON
-    wrtr.writerow([myTable])
-
+def summary_table(sheet, user_id, last_name, first_name, total, value):
     for i in range(0, len(user_id)):
-        myTable = NEWLINE
-        myTable += user_id[i]
-        myTable += SEMICOLON
-        myTable += last_name[i]
-        myTable += SEMICOLON
-        myTable += first_name[i]
-        myTable += SEMICOLON
-        myTable += total[i]
-        myTable += SEMICOLON
-        myTable += str(int(total[i]) * 100 / value)
-        myTable += PERCENT
-        wrtr.writerow([myTable])
+        sheet['A{}'.format(i + 2)] = user_id[i]
+        sheet['B{}'.format(i + 2)] = last_name[i]
+        sheet['C{}'.format(i + 2)] = first_name[i]
+        sheet['D{}'.format(i + 2)] = int(total[i])
+        sheet['E{}'.format(i + 2)] = int(int(total[i]) * 100 / value)
 
-def number_points(wrtr, user_id, last_name, first_name, total, value):
+def number_points(sheet, user_id, last_name, first_name, total, value, last_line_index):
+    curr_last_line_index = last_line_index
+    count = 1
     for i in range(0, len(user_id)):
         if int(total[i]) == value:
-            myTable = ''
-            myTable += user_id[i]
-            myTable += SEMICOLON
-            myTable += last_name[i]
-            myTable += SEMICOLON
-            myTable += first_name[i]
+            sheet['A{}'.format(count + last_line_index)] = user_id[i]
+            sheet['B{}'.format(count + last_line_index)] = last_name[i]
+            sheet['C{}'.format(count + last_line_index)] = first_name[i]
+            curr_last_line_index = count + last_line_index
+            count += 1
+    return (curr_last_line_index + 2)
 
-            wrtr.writerow([myTable])
-
-def percentage(wrtr, total, max_value):
-    count_one = 0
-    count_two = 0
-    count_three = 0
+def percentage(sheet, user_id, last_name, first_name, total, max_value, last_line_index, a, b):
+    curr_last_line_index = last_line_index
+    count = 1
     for i in range(0, len(total)):
-        if int(total[i]) * 100 / max_value < 40:
-            count_one += 1
-        if 40 <= int(total[i]) * 100 / max_value <= 70:
-            count_two += 1
-        if int(total[i]) * 100 / max_value > 70:
-            count_three += 1
-    wrtr.writerow([LESS_40_PERCENT.format(count_one)])
-    wrtr.writerow([MORE_40_LESS_70_PERCENT.format(count_two)])
-    wrtr.writerow([MORE_70_PERCENT.format(count_three)])
+        if a <= int(total[i]) * 100 / max_value <= b:
+            sheet['A{}'.format(count + last_line_index)] = user_id[i]
+            sheet['B{}'.format(count + last_line_index)] = last_name[i]
+            sheet['C{}'.format(count + last_line_index)] = first_name[i]
+            sheet['D{}'.format(count + last_line_index)] = int(total[i])
+            sheet['E{}'.format(count + last_line_index)] = int(int(total[i]) * 100 / max_value)
+            curr_last_line_index = count + last_line_index
+            count += 1
 
-def first_table(wrtr, module_name, max_score, user_id, last_name, first_name, total):
-    wrtr.writerow(module_name)
-    wrtr.writerow(NEWLINE)
-    wrtr.writerow(TABLE_ONE)
-    if __name__ == '__main__':
-        summary_table(wrtr, user_id, last_name, first_name, total, max_score)
+    return (curr_last_line_index + 2)
 
-def second_table(wrtr, user_id, last_name, first_name, total):
-    wrtr.writerow(NEWLINE)
-    wrtr.writerow(TABLE_TWO)
-    wrtr.writerow(SCORED_0_POINTS)
-    if __name__ == '__main__':
-        number_points(wrtr, user_id, last_name, first_name, total, 0)
+def first_table(wb, module_name, max_score, user_id, last_name, first_name, total):
+    sheet = wb.create_sheet(INITIAL_DATA.format(str(module_name)).decode('utf8'), 0)
+    sheet['A1'] = USER_ID
+    sheet['B1'] = LAST_NAME
+    sheet['C1'] = FIRST_NAME
+    sheet['D1'] = TOTAL
+    sheet['E1'] = PERCENTAGE_OF_TOTAL
+    sheet['G1'] = MAX_SCORE
+    sheet['H1'] = max_score
 
-def third_table(wrtr, user_id, last_name, first_name, total, max_score):
-    wrtr.writerow(NEWLINE)
-    wrtr.writerow(TABLE_THREE)
-    wrtr.writerow(SCORED_MAX_SCORE)
-    if __name__ == '__main__':
-        number_points(wrtr, user_id, last_name, first_name, total, max_score)
+    summary_table(sheet, user_id, last_name, first_name, total, max_score)
 
-def fourth_table(wrtr, total, max_score):
-    wrtr.writerow(NEWLINE)
-    wrtr.writerow(TABLE_FOUR)
-    if __name__ == '__main__':
-        percentage(wrtr, total, max_score)
+def second_table(wb, name, user_id, last_name, first_name, total, max_score):
+    sheet = wb.create_sheet(REPORT_DATE.format(str(name) + ' ' + str(datetime.datetime.now().strftime('%d %B'))).decode('utf8'), 1)
+    sheet['A1'] = GAINED_LESS_40_PERCENT
+    num = percentage(sheet, user_id, last_name, first_name, total, max_score, 1, 0, 39)
+    sheet['A{}'.format(num)] = GAINED_MORE_40_LESS_70_PERCENT
+    num = percentage(sheet, user_id, last_name, first_name, total, max_score, num, 40, 70)
+    sheet['A{}'.format(num)] = GAINED_MORE_70_PERCENT
+    percentage(sheet, user_id, last_name, first_name, total, max_score, num, 70, 100)
+
+def third_table(wb, name, user_id, last_name, first_name, total, max_score):
+    sheet = wb.create_sheet(REPORT.format(str(name)).decode('utf8'), 2)
+    sheet['A1'] = SCORED_0_POINTS
+    num = number_points(sheet, user_id, last_name, first_name, total, 0, 1)
+    sheet['A{}'.format(num)] = SCORED_MAX_SCORE.format(max_score)
+    number_points(sheet, user_id, last_name, first_name, total, max_score, num)
 
 def main():
     if __name__ == '__main__':
         max_score, module_name = pars()
-        wrtr, output_file = read_file()
+        wb = openpyxl.Workbook()
         user_id, last_name, first_name, total = filling_table()
-        first_table(wrtr, module_name, max_score, user_id, last_name, first_name, total)
-        second_table(wrtr, user_id, last_name, first_name, total)
-        third_table(wrtr, user_id, last_name, first_name, total, max_score)
-        fourth_table(wrtr, total, max_score)
-        close_file(output_file)
+        first_table(wb, module_name, max_score, user_id, last_name, first_name, total)
+        second_table(wb, module_name, user_id, last_name, first_name, total, max_score)
+        third_table(wb, module_name, user_id, last_name, first_name, total, max_score)
+        wb.save(FILE_PATH)
 
-if __name__ == '__main__':
-    main()
-
-'''if __name__ == '__main__':
-    max_score, module_name = pars()
-    wrtr, output_file = read_file()
-    user_id, last_name, first_name, total = filling_table()
-    first_table()
-    second_table()
-    third_table()
-    fourth_table()
-    close_file()'''
+main()
